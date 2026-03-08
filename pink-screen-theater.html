@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pink Screen — Metaverse Movie Theater</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Courier+Prime&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0a0005;
+    font-family: 'Courier Prime', monospace;
+    color: #ffb3d9;
+    overflow: hidden;
+  }
+
+  #canvas { display: block; }
+
+  #ui {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  #header {
+    position: absolute;
+    top: 32px; left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    pointer-events: none;
+  }
+
+  #header h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 3rem;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    color: #ff69b4;
+    text-shadow: 0 0 40px #ff69b480, 0 0 80px #ff1f8040;
+    animation: glow 3s ease-in-out infinite alternate;
+  }
+
+  #header p {
+    font-size: 0.75rem;
+    letter-spacing: 0.4em;
+    color: #ff69b480;
+    margin-top: 6px;
+    text-transform: uppercase;
+  }
+
+  @keyframes glow {
+    from { text-shadow: 0 0 30px #ff69b460, 0 0 60px #ff1f8030; }
+    to   { text-shadow: 0 0 60px #ff69b4a0, 0 0 120px #ff1f8060, 0 0 180px #ff69b420; }
+  }
+
+  #info {
+    position: absolute;
+    bottom: 32px; left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    font-size: 0.7rem;
+    letter-spacing: 0.25em;
+    color: #ff69b450;
+    text-transform: uppercase;
+  }
+
+  #badge {
+    position: absolute;
+    top: 32px; right: 32px;
+    border: 1px solid #ff69b430;
+    padding: 8px 16px;
+    font-size: 0.6rem;
+    letter-spacing: 0.3em;
+    color: #ff69b460;
+    text-transform: uppercase;
+    background: #ff69b405;
+  }
+
+  #controls {
+    position: absolute;
+    bottom: 32px; left: 32px;
+    font-size: 0.6rem;
+    letter-spacing: 0.2em;
+    color: #ff69b440;
+    line-height: 2;
+    text-transform: uppercase;
+    pointer-events: none;
+  }
+
+  #now-playing {
+    position: absolute;
+    top: 50%;
+    left: 32px;
+    transform: translateY(-50%);
+    font-size: 0.6rem;
+    letter-spacing: 0.2em;
+    color: #ff69b450;
+    line-height: 2.2;
+    text-transform: uppercase;
+    border-left: 1px solid #ff69b430;
+    padding-left: 16px;
+  }
+
+  #now-playing span {
+    display: block;
+    color: #ff69b490;
+  }
+
+  #scanline {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(255, 105, 180, 0.015) 2px,
+      rgba(255, 105, 180, 0.015) 4px
+    );
+    pointer-events: none;
+    z-index: 20;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="canvas"></canvas>
+
+<div id="scanline"></div>
+
+<div id="ui">
+  <div id="header">
+    <h1>PINK SCREEN</h1>
+    <p>Metaverse Movie Theater &nbsp;·&nbsp; RP1 Open Spatial Internet</p>
+  </div>
+
+  <div id="badge">RP1 · Open Metaverse</div>
+
+  <div id="now-playing">
+    Now Playing<br>
+    <span>— — —</span><br>
+    Venue<br>
+    <span>Theater 001</span><br>
+    Capacity<br>
+    <span>120 Seats</span><br>
+    Status<br>
+    <span>Live</span>
+  </div>
+
+  <div id="controls">
+    Drag · Rotate &nbsp;&nbsp; Scroll · Zoom
+  </div>
+
+  <div id="info">Drag to explore · Built for RP1 Hack 2026</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const W = window.innerWidth, H = window.innerHeight;
+const canvas = document.getElementById('canvas');
+
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setSize(W, H);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.8;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x050003);
+scene.fog = new THREE.FogExp2(0x0a0008, 0.025);
+
+const camera = new THREE.PerspectiveCamera(60, W / H, 0.1, 200);
+camera.position.set(0, 8, 22);
+camera.lookAt(0, 3, 0);
+
+// ── Materials ──────────────────────────────────────────────
+const pink       = new THREE.MeshStandardMaterial({ color: 0xff69b4, roughness: 0.6, metalness: 0.1 });
+const darkPink   = new THREE.MeshStandardMaterial({ color: 0x8b0057, roughness: 0.8, metalness: 0.0 });
+const deepRed    = new THREE.MeshStandardMaterial({ color: 0x3a0020, roughness: 0.9, metalness: 0.0 });
+const gold       = new THREE.MeshStandardMaterial({ color: 0xd4a843, roughness: 0.3, metalness: 0.8 });
+const screen     = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1.0, metalness: 0.0, emissive: 0xfff0f8, emissiveIntensity: 0.6 });
+const screenGlow = new THREE.MeshStandardMaterial({ color: 0xff99cc, roughness: 1.0, metalness: 0.0, emissive: 0xff69b4, emissiveIntensity: 0.2 });
+const velvet     = new THREE.MeshStandardMaterial({ color: 0x6b0040, roughness: 1.0, metalness: 0.0 });
+const floor      = new THREE.MeshStandardMaterial({ color: 0x1a0010, roughness: 0.9, metalness: 0.1 });
+const ceiling    = new THREE.MeshStandardMaterial({ color: 0x0d0008, roughness: 1.0, metalness: 0.0 });
+const wall       = new THREE.MeshStandardMaterial({ color: 0x150008, roughness: 0.95, metalness: 0.0 });
+const curtain    = new THREE.MeshStandardMaterial({ color: 0xcc1166, roughness: 1.0, metalness: 0.0, side: THREE.DoubleSide });
+
+function box(w, h, d, mat, x=0, y=0, z=0, rx=0, ry=0, rz=0) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+  m.position.set(x, y, z);
+  m.rotation.set(rx, ry, rz);
+  m.castShadow = true;
+  m.receiveShadow = true;
+  scene.add(m);
+  return m;
+}
+
+function cyl(rt, rb, h, seg, mat, x=0, y=0, z=0) {
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg), mat);
+  m.position.set(x, y, z);
+  m.castShadow = true;
+  m.receiveShadow = true;
+  scene.add(m);
+  return m;
+}
+
+// ── Room ──────────────────────────────────────────────────
+box(40, 0.3, 35, floor,   0, -0.15, 5);       // floor
+box(40, 20, 0.3, wall,    0, 10, -12);          // back wall
+box(40, 20, 0.3, wall,    0, 10, 22);           // front wall (behind camera)
+box(0.3, 20, 35, wall,    -20, 10, 5);          // left wall
+box(0.3, 20, 35, wall,    20, 10, 5);           // right wall
+box(40, 0.3, 35, ceiling, 0, 20, 5);            // ceiling
+
+// ── Screen wall + Movie Screen ─────────────────────────────
+box(40, 20, 0.5,  wall,        0, 10, -11.5);
+box(18,  9, 0.2,  screen,      0, 9,  -11.2);
+box(18.4, 9.4, 0.15, screenGlow, 0, 9, -11.35);
+
+// Screen frame
+box(18.8, 0.3, 0.3, gold,  0,    13.8, -11.1);
+box(18.8, 0.3, 0.3, gold,  0,    4.2,  -11.1);
+box(0.3,  9.8, 0.3, gold,  -9.4, 9,    -11.1);
+box(0.3,  9.8, 0.3, gold,   9.4, 9,    -11.1);
+
+// ── Stage / Proscenium ────────────────────────────────────
+box(22, 1.2, 4, deepRed,  0, 0.6, -8.5);      // stage platform
+box(22, 0.1, 4, pink,     0, 1.25, -8.5);      // stage lip highlight
+
+// Proscenium arch sides
+box(2, 12, 0.5, velvet,  -12, 6, -10);
+box(2, 12, 0.5, velvet,   12, 6, -10);
+box(24, 2,  0.5, velvet,   0, 13, -10);        // top arch
+
+// Gold trim on proscenium
+box(2.2, 0.15, 0.6, gold, -12, 12.1, -10);
+box(2.2, 0.15, 0.6, gold,  12, 12.1, -10);
+box(0.15, 12,  0.6, gold, -13.1, 6,  -10);
+box(0.15, 12,  0.6, gold,  13.1, 6,  -10);
+
+// ── Curtains ──────────────────────────────────────────────
+function makeCurtain(x, side) {
+  const pts = [];
+  const segments = 12;
+  for (let i = 0; i <= segments; i++) {
+    const t = i / segments;
+    const wave = Math.sin(t * Math.PI * 3) * 0.4 * side;
+    pts.push(new THREE.Vector3(wave, -t * 10, 0));
+  }
+  // Simple box curtain panels with pleating effect
+  for (let p = 0; p < 3; p++) {
+    const ox = side * (p * 0.6);
+    box(1.2, 10, 0.15, curtain, x + ox, 7, -10.2 + p * 0.1);
+  }
+}
+makeCurtain(-10, -1);
+makeCurtain(10, 1);
+
+// Curtain top valance
+box(6, 1.5, 0.8, curtain, -10, 12.5, -10);
+box(6, 1.5, 0.8, curtain,  10, 12.5, -10);
+
+// ── Seats ─────────────────────────────────────────────────
+function makeSeat(x, y, z) {
+  // seat base
+  box(0.9, 0.15, 0.9, velvet, x, y + 0.5, z);
+  // backrest
+  box(0.9, 0.9, 0.12, velvet, x, y + 1.0, z - 0.35);
+  // legs
+  box(0.08, 0.5, 0.08, darkPink, x-0.35, y+0.25, z+0.35);
+  box(0.08, 0.5, 0.08, darkPink, x+0.35, y+0.25, z+0.35);
+}
+
+const rows = 6;
+const cols = 10;
+const rowSpacing = 1.5;
+const colSpacing = 1.3;
+
+for (let r = 0; r < rows; r++) {
+  const raisedY = r * 0.35;
+  const zPos = -5 + r * rowSpacing;
+  for (let c = 0; c < cols; c++) {
+    const xPos = (c - (cols-1)/2) * colSpacing;
+    makeSeat(xPos, raisedY, zPos);
+  }
+}
+
+// ── Aisle lights ──────────────────────────────────────────
+for (let r = 0; r < rows; r++) {
+  const z = -5 + r * 1.5;
+  const y = r * 0.35 + 0.15;
+  [-7.5, 7.5].forEach(x => {
+    const gl = new THREE.Mesh(
+      new THREE.SphereGeometry(0.08, 8, 8),
+      new THREE.MeshStandardMaterial({ emissive: 0xff69b4, emissiveIntensity: 2, color: 0xff69b4 })
+    );
+    gl.position.set(x, y, z);
+    scene.add(gl);
+    const pl = new THREE.PointLight(0xff69b4, 0.3, 3);
+    pl.position.set(x, y + 0.1, z);
+    scene.add(pl);
+  });
+}
+
+// ── Ceiling details ───────────────────────────────────────
+// Chandelier
+cyl(0.05, 0.05, 3, 8, gold, 0, 18.5, 2);
+const chandelierBase = new THREE.Mesh(new THREE.SphereGeometry(0.3, 16, 16),
+  new THREE.MeshStandardMaterial({ color: 0xd4a843, roughness: 0.2, metalness: 0.9, emissive: 0xffd700, emissiveIntensity: 0.3 }));
+chandelierBase.position.set(0, 17, 2);
+scene.add(chandelierBase);
+
+const chandelierLight = new THREE.PointLight(0xfff0d0, 1.5, 20);
+chandelierLight.position.set(0, 16.5, 2);
+scene.add(chandelierLight);
+
+// Ceiling rose details
+for (let i = 0; i < 8; i++) {
+  const angle = (i / 8) * Math.PI * 2;
+  const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.5, 6),
+    new THREE.MeshStandardMaterial({ color: 0xd4a843, metalness: 0.8, roughness: 0.2 }));
+  arm.position.set(Math.cos(angle) * 0.8, 17, 2 + Math.sin(angle) * 0.8);
+  arm.rotation.z = Math.PI / 2;
+  arm.rotation.y = angle;
+  scene.add(arm);
+}
+
+// ── Lighting ──────────────────────────────────────────────
+const ambient = new THREE.AmbientLight(0x1a0010, 0.8);
+scene.add(ambient);
+
+// Screen projection light
+const screenLight = new THREE.RectAreaLight(0xfff0f8, 3, 18, 9);
+screenLight.position.set(0, 9, -10.5);
+screenLight.lookAt(0, 9, 0);
+scene.add(screenLight);
+
+// Pink fill lights
+const fill1 = new THREE.PointLight(0xff69b4, 1.2, 30);
+fill1.position.set(-15, 12, -5);
+scene.add(fill1);
+
+const fill2 = new THREE.PointLight(0xff1f80, 0.8, 30);
+fill2.position.set(15, 12, -5);
+scene.add(fill2);
+
+// Stage spotlights
+[-6, 0, 6].forEach(x => {
+  const spot = new THREE.SpotLight(0xffc0e0, 2, 25, Math.PI/8, 0.3);
+  spot.position.set(x, 18, -6);
+  spot.target.position.set(x * 0.5, 0, -8);
+  spot.castShadow = true;
+  scene.add(spot);
+  scene.add(spot.target);
+});
+
+// Back warm light
+const backLight = new THREE.DirectionalLight(0xff99cc, 0.4);
+backLight.position.set(0, 15, 10);
+backLight.castShadow = true;
+scene.add(backLight);
+
+// ── Floating particles ─────────────────────────────────────
+const particleCount = 200;
+const particleGeo = new THREE.BufferGeometry();
+const positions = new Float32Array(particleCount * 3);
+const particleSpeeds = [];
+
+for (let i = 0; i < particleCount; i++) {
+  positions[i * 3]     = (Math.random() - 0.5) * 35;
+  positions[i * 3 + 1] = Math.random() * 18;
+  positions[i * 3 + 2] = (Math.random() - 0.5) * 30;
+  particleSpeeds.push(0.005 + Math.random() * 0.01);
+}
+
+particleGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+const particleMat = new THREE.PointsMaterial({ color: 0xff69b4, size: 0.06, transparent: true, opacity: 0.6 });
+const particles = new THREE.Points(particleGeo, particleMat);
+scene.add(particles);
+
+// ── Mouse drag orbit ──────────────────────────────────────
+let isDragging = false;
+let prevMouse = { x: 0, y: 0 };
+let spherical = { theta: 0, phi: Math.PI / 6, radius: 22 };
+const target = new THREE.Vector3(0, 4, 0);
+
+canvas.addEventListener('mousedown', e => { isDragging = true; prevMouse = { x: e.clientX, y: e.clientY }; });
+canvas.addEventListener('mouseup', () => isDragging = false);
+canvas.addEventListener('mousemove', e => {
+  if (!isDragging) return;
+  const dx = e.clientX - prevMouse.x;
+  const dy = e.clientY - prevMouse.y;
+  spherical.theta -= dx * 0.005;
+  spherical.phi = Math.max(0.1, Math.min(Math.PI / 2.2, spherical.phi - dy * 0.005));
+  prevMouse = { x: e.clientX, y: e.clientY };
+});
+canvas.addEventListener('wheel', e => {
+  spherical.radius = Math.max(8, Math.min(40, spherical.radius + e.deltaY * 0.05));
+});
+
+// Touch support
+canvas.addEventListener('touchstart', e => {
+  isDragging = true;
+  prevMouse = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+});
+canvas.addEventListener('touchend', () => isDragging = false);
+canvas.addEventListener('touchmove', e => {
+  if (!isDragging) return;
+  const dx = e.touches[0].clientX - prevMouse.x;
+  const dy = e.touches[0].clientY - prevMouse.y;
+  spherical.theta -= dx * 0.005;
+  spherical.phi = Math.max(0.1, Math.min(Math.PI / 2.2, spherical.phi - dy * 0.005));
+  prevMouse = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+});
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ── Animate ───────────────────────────────────────────────
+let t = 0;
+function animate() {
+  requestAnimationFrame(animate);
+  t += 0.01;
+
+  // Orbit camera
+  camera.position.x = target.x + spherical.radius * Math.sin(spherical.phi) * Math.sin(spherical.theta);
+  camera.position.y = target.y + spherical.radius * Math.cos(spherical.phi);
+  camera.position.z = target.z + spherical.radius * Math.sin(spherical.phi) * Math.cos(spherical.theta);
+  camera.lookAt(target);
+
+  // Pulse screen glow
+  screenGlow.emissiveIntensity = 0.15 + Math.sin(t * 0.7) * 0.08;
+  screen.emissiveIntensity = 0.5 + Math.sin(t * 0.5) * 0.15;
+
+  // Chandelier pulse
+  chandelierLight.intensity = 1.3 + Math.sin(t * 1.2) * 0.2;
+
+  // Float particles
+  const pos = particles.geometry.attributes.position.array;
+  for (let i = 0; i < particleCount; i++) {
+    pos[i * 3 + 1] += particleSpeeds[i];
+    if (pos[i * 3 + 1] > 19) pos[i * 3 + 1] = 0;
+  }
+  particles.geometry.attributes.position.needsUpdate = true;
+  particles.rotation.y = t * 0.02;
+
+  renderer.render(scene, camera);
+}
+
+animate();
+</script>
+</body>
+</html>
